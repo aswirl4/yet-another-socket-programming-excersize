@@ -6,14 +6,15 @@
 
 struct Message {
     std::string content;
-    int timestamp;
+//    time_t timestamp;
 };
 
 class ChatRoom {
 public:
+    ChatRoom();
     ChatRoom(int message_lifetime, int message_rate_limit);
 
-    void add_message(const std::string& content, int timestamp);
+    bool add_message(const std::string& content);
     std::string get_chat_history();
 
 private:

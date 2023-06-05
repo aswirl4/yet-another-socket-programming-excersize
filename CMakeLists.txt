@@ -7,6 +7,8 @@ add_executable(netAssignment
         main.cpp
         Server.cpp
         Server.h
+        Config.cpp
+        Config.h
         ChatRoom.cpp
         ChatRoom.h
         Request.h

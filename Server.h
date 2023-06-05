@@ -10,18 +10,19 @@
 
 class Server {
 public:
-    Server(const Config& config);
+    explicit Server(const Config& config);
 
     // Assuming that Server has a constructor that initializes chat_room
 
     Response handle_chat_request(const Request& request);
-    Response handle_file_request(const Request& request);
-    void start();
+    static Response handle_file_request(const Request& request);
+
+    [[noreturn]] void start();
 
 private:
     ChatRoom chat_room;
     void handle_request(int client_sockfd);
-    int create_server(int port);
+    static int create_server(int port);
 
     int server_sockfd;
     Config config;

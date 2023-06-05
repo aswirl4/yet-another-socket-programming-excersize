@@ -9,8 +9,7 @@ struct Config {
     int port;
     int message_lifetime;
     int message_rate_limit;
-
-    Config(const std::string& config_filename);
+    explicit Config(const std::string& config_filename);
 };
 
 #endif // CONFIG_H
