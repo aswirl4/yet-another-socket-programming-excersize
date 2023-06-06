@@ -4,24 +4,37 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <cstring>
-
 #include "Request.h"
 #include "Response.h"
 #include "utils.h" // 此头文件需要后续创建，用于包含parse_request和format_response函数的声明
-
+#include <csignal>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
+// the reason of this value's existence is that we need to close server_sockfd in handle_sigint
+// this is the easiest way to do it; pass value to handle_sigint function is goddamn hard
+int global_server_sockfd;
+
+void handle_sigint(int sig) {
+    // print close ifo
+    std::cout << "Server is closed" << std::endl;
+    close(global_server_sockfd);
+    exit(0);
+}
+
+
+std::string Server::file_dir = "./filesSharing/";
+
 Server::Server(const Config &config) : config(config) {
     server_sockfd = create_server(config.port);
     chat_room = ChatRoom(config.message_lifetime, config.message_rate_limit);
-    file_dir = std::string("./filesSharing");
 }
 
 [[noreturn]] void Server::start() {
     listen(server_sockfd, 5);
-
+    global_server_sockfd = server_sockfd;
+    signal(SIGINT, handle_sigint);
     //print server info
     std::cout << "Server is listening on port " << config.port << std::endl;
 
@@ -37,10 +50,6 @@ Server::Server(const Config &config) : config(config) {
     }
 }
 
-void Server::close(int sig) {
-    std::cout << "Server is closing..." << std::endl;
-    ::close(server_sockfd);
-}
 
 /*
  * this code only handle ipv4 connection.
@@ -122,43 +131,45 @@ Response Server::handle_chat_request(const Request &request) {
     }
     response_body +=
             R"delimiter(<!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset=\"utf-8\">
-                <title>发送HTTP请求</title>
-                <script>
-                    function sendData() {
-                        var input = document.getElementById(\"inputText\").value;
-                        var url = window.location.href;
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>发送HTTP请求</title>
+    <script>
+        function sendData() {
+            var input = document.getElementById("inputText").value;
+            var url = window.location.href;
 
-                        var xhr = new XMLHttpRequest();
-                        xhr.open(\"POST\", url, true);
-                        xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");
-                        xhr.onreadystatechange = function () {
-                            if (xhr.readyState === 4 && xhr.status === 200) {
-                                // 请求成功后的处理逻辑
-                                console.log(xhr.responseText);
-                            }
-                        };
-                        xhr.send(input);
-                    }
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    // 请求成功后的处理逻辑
+                    console.log(xhr.responseText);
+                }
+            };
+            xhr.send(input);
+        }
 
-                    function refreshPage() {
-                        window.location.reload();
-                    }
-                </script>
-            </head>
-            <body>
-            <pre>
-            current chat history is:
-            ----------------------------------------)delimiter"
+        function refreshPage() {
+            window.location.reload();
+        }
+    </script>
+</head>
+<body>
+<pre>
+current chat history is:
+----------------------------------------
+)delimiter"
             + chat_room.get_chat_history()
-            +R"delimiter(</pre>
-                <input type=\"text\" id=\"inputText\" autofocus>
-                <button onclick=\"sendData()\">发送</button>
-                <button onclick=\"refreshPage()\">刷新页面</button>
-            </body>
-            </html>)delimiter";
+            + R"delimiter(
+</pre>
+    <input type="text" id="inputText" autofocus>
+    <button onclick="sendData()">发送</button>
+    <button onclick="refreshPage()">刷新页面</button>
+</body>
+</html>)delimiter";
 // 可以写的更好, 但是就10分分值, 不值得.
     return {response_body, response_status};
 }
@@ -196,10 +207,12 @@ Response Server::handle_file_request(const Request &request) {
                         <button id="uploadButton" onclick="upload()">上传文件</button>
                     <pre>
                     current files list is:
-                    ----------------------------------------)delimiter"
+                    ----------------------------------------
+)delimiter"
                     + response_body
                     +
-                    R"delimiter(</pre>
+                    R"delimiter(
+</pre>
                         <script>
                           function upload() {
                             const fileInput = document.getElementById('fileInput');
@@ -269,9 +282,21 @@ Response Server::handle_file_request(const Request &request) {
         std::cout << "----------------------------------------" << std::endl;
 
         std::ofstream OsWrite(file_dir + file_name, std::ofstream::trunc);
+
+//        std::cout << "am i writing?: "
+//                     "\n file_dir"
+//                     + file_dir + file_name
+//                  << request.body;
+
         OsWrite << request.body;
         OsWrite << std::endl;
         return {response_body, response_status};
     }
-
+    return {response_body, response_status};
 }
+
+int Server::get_server_sockfd() const {
+    return server_sockfd;
+}
+
+
